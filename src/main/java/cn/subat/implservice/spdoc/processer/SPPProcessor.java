@@ -1,9 +1,6 @@
 package cn.subat.implservice.spdoc.processer;
 
-import cn.subat.implservice.spdoc.annotation.SPDoc;
-import cn.subat.implservice.spdoc.annotation.SPDocConsumer;
-import cn.subat.implservice.spdoc.annotation.SPDocDefine;
-import cn.subat.implservice.spdoc.annotation.SPDocService;
+import cn.subat.implservice.spdoc.annotation.*;
 import com.google.auto.service.AutoService;
 import org.yaml.snakeyaml.Yaml;
 
@@ -110,11 +107,7 @@ public class SPPProcessor extends AbstractProcessor {
                     "requestBody", Map.of(
                             "content",Map.of(
                                     "application/json",Map.of(
-                                            "schema",Map.of(
-                                                    "type","object",
-                                                    "properties",processConsumerParam(consumer)
-
-                                            )
+                                            "schema",processConsumerParam(consumer)
                                     )
                             )
                     )
@@ -146,7 +139,7 @@ public class SPPProcessor extends AbstractProcessor {
     }
 
 
-    private LinkedHashMap<String,Object> processConsumerParam(Element consumer){
+    private LinkedHashMap<String, Object> processConsumerParam(Element consumer){
         LinkedHashMap<String,Object> map = new LinkedHashMap<>();
         ExecutableElement executable = (ExecutableElement) consumer;
         List<? extends VariableElement> parameters = executable.getParameters();
@@ -154,9 +147,12 @@ public class SPPProcessor extends AbstractProcessor {
             if(parameters.size() == 1){
                 map = typeMirrorToMap(parameters.get(0).asType(),"set",consumer.asType());
             }else{
+                LinkedHashMap<String,Object> subMap = new LinkedHashMap<>();
                 for (VariableElement variableElement:parameters){
-                    map.put(variableElement.getSimpleName().toString(),typeMirrorToMap(variableElement.asType(),"set",consumer.asType()));
+                    subMap.put(variableElement.getSimpleName().toString(),typeMirrorToMap(variableElement.asType(),"set",consumer.asType()));
                 }
+                map.put("type","object");
+                map.put("properties",subMap);
             }
         }
         return map;
@@ -167,7 +163,13 @@ public class SPPProcessor extends AbstractProcessor {
         LinkedHashMap<String,Object> map = new LinkedHashMap<>();
         for (Element element:declaredType.asElement().getEnclosedElements()){
             if(element.getKind() == ElementKind.FIELD){
-                map.put(element.getSimpleName().toString(), typeMirrorToMap(element.asType(),actionType,declaredType));
+                LinkedHashMap<String,Object> childMap = typeMirrorToMap(element.asType(),actionType,declaredType);
+                if(element.getAnnotation(SPDocField.class) != null){
+                    SPDocField docField = element.getAnnotation(SPDocField.class);
+                    childMap.put("description",docField.name());
+                    childMap.put("format",docField.format());
+                }
+                map.put(element.getSimpleName().toString(),childMap);
             }
         }
         return map;
@@ -216,7 +218,6 @@ public class SPPProcessor extends AbstractProcessor {
         switch (declaredType.asElement().getSimpleName().toString()){
             case "String":{
                 map.put("type","string");
-                map.put("description","Hello String");
                 break;
             }
             case "Long":{
