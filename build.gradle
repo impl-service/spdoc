@@ -1,0 +1,26 @@
+plugins {
+    id 'java'
+}
+
+group 'cn.subat.implservice.user'
+version '0.1'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    annotationProcessor group: 'com.google.auto.service', name: 'auto-service', version: '1.0'
+    implementation group: 'com.google.auto.service', name: 'auto-service', version: '1.0'
+
+    implementation group: 'org.yaml',name: 'snakeyaml',version: '1.25'
+
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.0'
+}
+
+test {
+    useJUnitPlatform()
+}
