@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group 'cn.subat.implservice.user'
+group 'cn.subat.implservice'
 version '0.1'
 
 repositories {
