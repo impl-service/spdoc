@@ -15,7 +15,7 @@ import java.io.*;
 import java.util.*;
 
 @SupportedAnnotationTypes("cn.subat.implservice.spdoc.annotation.*")
-@SupportedSourceVersion(SourceVersion.RELEASE_11)
+@SupportedSourceVersion(SourceVersion.RELEASE_8)
 @AutoService(Processor.class)
 public class SPPProcessor extends AbstractProcessor {
 
