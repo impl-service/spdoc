@@ -1,5 +1,6 @@
 package cn.subat.implservice.spdoc.processer;
 
+import cn.subat.implservice.spdoc.SPHashMap;
 import cn.subat.implservice.spdoc.annotation.*;
 import com.google.auto.service.AutoService;
 import org.yaml.snakeyaml.DumperOptions;
@@ -15,7 +16,6 @@ import java.io.*;
 import java.util.*;
 
 @SupportedAnnotationTypes("cn.subat.implservice.spdoc.annotation.*")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 @AutoService(Processor.class)
 public class SPPProcessor extends AbstractProcessor {
 
@@ -63,18 +63,22 @@ public class SPPProcessor extends AbstractProcessor {
             String docName = docService.title().isEmpty()?service.getSimpleName().toString() : docService.title();
             String docDescription = docService.description().isEmpty()?"":docService.description();
             if(!docService.url().isEmpty()){
-                docMap.put("servers",List.of(Map.of("url",docService.url(),"description","")));
+                docMap.put("servers",Arrays.asList(new SPHashMap("url",docService.url(),"description","")));
             }
             info.put("title",docName);
             info.put("description",docDescription);
-            docMap.put("components",Map.of("securitySchemes",Map.of(
-                    "auth",Map.of(
-                            "type",docService.securitySchema().type(),
-                            "scheme",docService.securitySchema().scheme(),
-                            "bearerFormat",docService.securitySchema().bearerFormat()
-                    ))
-            ));
-            docMap.put("security",List.of(Map.of("auth",List.of())));
+            docMap.put("components",
+                    new SPHashMap("securitySchemes",
+                            new SPHashMap("auth",
+                                    new SPHashMap(
+                                            "type",docService.securitySchema().type(),
+                                            "scheme",docService.securitySchema().scheme(),
+                                            "bearerFormat",docService.securitySchema().bearerFormat()
+                                    )
+                            )
+                    )
+            );
+            docMap.put("security",Arrays.asList(new SPHashMap("auth",Arrays.asList())));
         }
         docMap.put("openapi","3.0.1");
         docMap.put("info",info);
@@ -117,9 +121,9 @@ public class SPPProcessor extends AbstractProcessor {
             }
             map.put("description",docConsumer.name());
             map.put(
-                    "requestBody", Map.of(
-                            "content",Map.of(
-                                    "application/json",Map.of(
+                    "requestBody", new SPHashMap(
+                            "content",new SPHashMap(
+                                    "application/json",new SPHashMap(
                                             "schema",processConsumerParam(consumer)
                                     )
                             )
@@ -128,20 +132,20 @@ public class SPPProcessor extends AbstractProcessor {
 
 
             LinkedHashMap<String,Object> responseMao = new LinkedHashMap<>();
-            responseMao.put("1",Map.of(
+            responseMao.put("1",new SPHashMap(
                             "description","success",
-                            "content",Map.of(
-                                    "application/json",Map.of(
+                            "content",new SPHashMap(
+                                    "application/json",new SPHashMap(
                                             "schema",processConsumerReturn(consumer)
                                     )
                             )));
             if(docConsumer.code().length > 0){
                 for (SPDocCode code:docConsumer.code()){
-                    responseMao.put(code.code()+"",Map.of("description",code.msg()));
+                    responseMao.put(code.code()+"",new SPHashMap("description",code.msg()));
                 }
             }
             map.put("responses",responseMao);
-            path.put(api,Map.of("post",map));
+            path.put(api,new SPHashMap("post",map));
         }
         docMap.put("paths",path);
     }
