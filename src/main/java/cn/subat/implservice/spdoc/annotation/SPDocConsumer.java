@@ -11,4 +11,5 @@ import java.util.Map;
 @Target(ElementType.METHOD)
 public @interface SPDocConsumer {
     String name() default "";
+    SPDocCode[] code() default {};
 }

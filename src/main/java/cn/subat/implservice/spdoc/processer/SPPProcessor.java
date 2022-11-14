@@ -2,7 +2,9 @@ package cn.subat.implservice.spdoc.processer;
 
 import cn.subat.implservice.spdoc.annotation.*;
 import com.google.auto.service.AutoService;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.nodes.Tag;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -41,7 +43,7 @@ public class SPPProcessor extends AbstractProcessor {
         try {
             Writer writer = processingEnv.getFiler()
                     .createResource(StandardLocation.CLASS_OUTPUT, "spdoc", "api.yaml").openWriter();
-            yaml.dump(docMap,writer);
+            writer.write(yaml.dumpAs(docMap, Tag.MAP, DumperOptions.FlowStyle.BLOCK));
             writer.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -65,6 +67,14 @@ public class SPPProcessor extends AbstractProcessor {
             }
             info.put("title",docName);
             info.put("description",docDescription);
+            docMap.put("components",Map.of("securitySchemes",Map.of(
+                    "auth",Map.of(
+                            "type",docService.securitySchema().type(),
+                            "scheme",docService.securitySchema().scheme(),
+                            "bearerFormat",docService.securitySchema().bearerFormat()
+                    ))
+            ));
+            docMap.put("security",List.of(Map.of("auth",List.of())));
         }
         docMap.put("openapi","3.0.1");
         docMap.put("info",info);
@@ -78,7 +88,6 @@ public class SPPProcessor extends AbstractProcessor {
     private void processService(Set<? extends Element> services){
         ArrayList<Map<String,String>> list = new ArrayList<>();
         for (Element service:services){
-
             SPDocService docService = service.getAnnotation(SPDocService.class);
             String serviceName = docService.name().isEmpty()?service.getSimpleName().toString() : docService.name();
             String serviceDescription = docService.description().isEmpty()?"":docService.description();
@@ -102,6 +111,10 @@ public class SPPProcessor extends AbstractProcessor {
                     api = mirror.getElementValues().toString().split("\"")[1];
                 }
             }
+            SPDocService docService = consumer.getEnclosingElement().getAnnotation(SPDocService.class);
+            if(docService != null){
+                map.put("tags",new String[]{docService.name()});
+            }
             map.put("description",docConsumer.name());
             map.put(
                     "requestBody", Map.of(
@@ -112,21 +125,23 @@ public class SPPProcessor extends AbstractProcessor {
                             )
                     )
             );
-            map.put(
-                    "responses",Map.of(
-                            "200", Map.of(
-                                    "description","hello",
-                                    "content",Map.of(
-                                            "application/json",Map.of(
-                                                    "schema",processConsumerReturn(consumer)
-                                            )
+
+
+            LinkedHashMap<String,Object> responseMao = new LinkedHashMap<>();
+            responseMao.put("1",Map.of(
+                            "description","success",
+                            "content",Map.of(
+                                    "application/json",Map.of(
+                                            "schema",processConsumerReturn(consumer)
                                     )
-                            )
-                    )
-            );
+                            )));
+            if(docConsumer.code().length > 0){
+                for (SPDocCode code:docConsumer.code()){
+                    responseMao.put(code.code()+"",Map.of("description",code.msg()));
+                }
+            }
+            map.put("responses",responseMao);
             path.put(api,Map.of("post",map));
-
-
         }
         docMap.put("paths",path);
     }
@@ -135,7 +150,7 @@ public class SPPProcessor extends AbstractProcessor {
     private LinkedHashMap<String,Object> processConsumerReturn(Element consumer){
         ExecutableElement executable = (ExecutableElement) consumer;
         TypeMirror returnType = executable.getReturnType();
-        return typeMirrorToMap(returnType,"get",consumer.asType());
+        return typeMirrorToMap(returnType,consumer.asType());
     }
 
 
@@ -145,11 +160,11 @@ public class SPPProcessor extends AbstractProcessor {
         List<? extends VariableElement> parameters = executable.getParameters();
         if(parameters.size() > 0){
             if(parameters.size() == 1){
-                map = typeMirrorToMap(parameters.get(0).asType(),"set",consumer.asType());
+                map = typeMirrorToMap(parameters.get(0).asType(),consumer.asType());
             }else{
                 LinkedHashMap<String,Object> subMap = new LinkedHashMap<>();
                 for (VariableElement variableElement:parameters){
-                    subMap.put(variableElement.getSimpleName().toString(),typeMirrorToMap(variableElement.asType(),"set",consumer.asType()));
+                    subMap.put(variableElement.getSimpleName().toString(),typeMirrorToMap(variableElement.asType(),consumer.asType()));
                 }
                 map.put("type","object");
                 map.put("properties",subMap);
@@ -159,11 +174,11 @@ public class SPPProcessor extends AbstractProcessor {
     }
 
 
-    private LinkedHashMap<String,Object> declareTypeToMap(DeclaredType declaredType,String actionType){
+    private LinkedHashMap<String,Object> declareTypeToMap(DeclaredType declaredType){
         LinkedHashMap<String,Object> map = new LinkedHashMap<>();
         for (Element element:declaredType.asElement().getEnclosedElements()){
             if(element.getKind() == ElementKind.FIELD){
-                LinkedHashMap<String,Object> childMap = typeMirrorToMap(element.asType(),actionType,declaredType);
+                LinkedHashMap<String,Object> childMap = typeMirrorToMap(element.asType(),declaredType);
                 if(element.getAnnotation(SPDocField.class) != null){
                     SPDocField docField = element.getAnnotation(SPDocField.class);
                     childMap.put("description",docField.name());
@@ -175,24 +190,30 @@ public class SPPProcessor extends AbstractProcessor {
         return map;
     }
 
-    private LinkedHashMap<String,Object> typeMirrorToMap(TypeMirror parameter, String actionType,TypeMirror parentType){
+    private LinkedHashMap<String,Object> typeMirrorToMap(TypeMirror parameter,TypeMirror parentType){
         LinkedHashMap<String,Object> map = new LinkedHashMap<>();
+
+
+
         switch (parameter.getKind()){
             case DECLARED:{
                 DeclaredType parameterType = (DeclaredType) parameter;
                 if(parameterType.asElement().getEnclosingElement().toString().equals("java.lang")){
                     map = javaLangTypeToMap(parameterType);
+                }else if (parameterType.asElement().getEnclosingElement().toString().equals("java.util")){
+                    map = javaUtilTypeToMap(parameterType);
                 }else {
                     if(parameterType.asElement().getAnnotation(SPDoc.class) != null){
                         map.put("type",parameterType.asElement().getSimpleName().toString());
-                        map.put("properties",declareTypeToMap(parameterType,actionType));
+                        map.put("properties",declareTypeToMap(parameterType));
                     }
                 }
+
                 break;
             }
             case ARRAY:{
                 map.put("type","array");
-                map.put("items",typeMirrorToMap(((ArrayType) parameter).getComponentType(),actionType,parameter));
+                map.put("items",typeMirrorToMap(((ArrayType) parameter).getComponentType(),parameter));
                 break;
             }
             case INT:{
@@ -201,7 +222,7 @@ public class SPPProcessor extends AbstractProcessor {
             }
             case TYPEVAR:{
                 if(parentType instanceof DeclaredType){
-                    return typeMirrorToMap(((DeclaredType) parentType).getTypeArguments().get(0),actionType,parentType);
+                    return typeMirrorToMap(((DeclaredType) parentType).getTypeArguments().get(0),parentType);
                 }
                 break;
             }
@@ -222,6 +243,19 @@ public class SPPProcessor extends AbstractProcessor {
             }
             case "Long":{
                 map.put("type","integer");
+            }
+        }
+        return map;
+    }
+
+    private LinkedHashMap<String,Object> javaUtilTypeToMap(DeclaredType declaredType){
+        LinkedHashMap<String,Object> map = new LinkedHashMap<>();
+        switch (declaredType.asElement().getSimpleName().toString()){
+            case "List":{
+                map.put("type","array");
+                TypeMirror typeMirror = declaredType.getTypeArguments().get(0);
+                map.put("items",typeMirrorToMap(typeMirror,declaredType));
+                break;
             }
         }
         return map;

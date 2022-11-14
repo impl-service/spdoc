@@ -37,4 +37,6 @@ public @interface SPDocDefine {
      **/
     String version() default "";
 
+    SPDocSecurity securitySchema() default @SPDocSecurity(scheme = "bearer",type = "http");
+
 }
