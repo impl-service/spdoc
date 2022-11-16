@@ -5,6 +5,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.SOURCE)
 @Inherited
 public @interface SPDocField {
-    String name() default "";
+    String value();
     String format() default "";
 }

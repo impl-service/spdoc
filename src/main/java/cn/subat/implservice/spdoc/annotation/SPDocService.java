@@ -8,6 +8,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
 public @interface SPDocService {
-    String name() default "";
+    String value();
     String description() default "";
 }

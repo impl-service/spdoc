@@ -93,7 +93,7 @@ public class SPPProcessor extends AbstractProcessor {
         ArrayList<Map<String,String>> list = new ArrayList<>();
         for (Element service:services){
             SPDocService docService = service.getAnnotation(SPDocService.class);
-            String serviceName = docService.name().isEmpty()?service.getSimpleName().toString() : docService.name();
+            String serviceName = docService.value().isEmpty()?service.getSimpleName().toString() : docService.value();
             String serviceDescription = docService.description().isEmpty()?"":docService.description();
             LinkedHashMap<String,String> map = new LinkedHashMap<>();
             map.put("name",serviceName);
@@ -117,9 +117,9 @@ public class SPPProcessor extends AbstractProcessor {
             }
             SPDocService docService = consumer.getEnclosingElement().getAnnotation(SPDocService.class);
             if(docService != null){
-                map.put("tags",new String[]{docService.name()});
+                map.put("tags",new String[]{docService.value()});
             }
-            map.put("description",docConsumer.name());
+            map.put("description",docConsumer.value());
             map.put(
                     "requestBody", new SPHashMap(
                             "content",new SPHashMap(
@@ -185,10 +185,18 @@ public class SPPProcessor extends AbstractProcessor {
                 LinkedHashMap<String,Object> childMap = typeMirrorToMap(element.asType(),declaredType);
                 if(element.getAnnotation(SPDocField.class) != null){
                     SPDocField docField = element.getAnnotation(SPDocField.class);
-                    childMap.put("description",docField.name());
+                    childMap.put("description",docField.value());
                     childMap.put("format",docField.format());
                 }
-                map.put(element.getSimpleName().toString(),childMap);
+
+                String name = element.getSimpleName().toString();
+                for (AnnotationMirror mirror: element.getAnnotationMirrors()){
+                    Element element1 = mirror.getAnnotationType().asElement();
+                    if(element1.getSimpleName().toString().equals("JsonProperty")){
+                        name = mirror.getElementValues().toString().split("\"")[1];
+                    }
+                }
+                map.put(name,childMap);
             }
         }
         return map;
@@ -245,6 +253,7 @@ public class SPPProcessor extends AbstractProcessor {
                 map.put("type","string");
                 break;
             }
+            case "Integer":
             case "Long":{
                 map.put("type","integer");
             }

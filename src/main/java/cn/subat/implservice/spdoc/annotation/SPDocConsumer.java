@@ -10,6 +10,6 @@ import java.util.Map;
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.METHOD)
 public @interface SPDocConsumer {
-    String name() default "";
+    String value() default "";
     SPDocCode[] code() default {};
 }
