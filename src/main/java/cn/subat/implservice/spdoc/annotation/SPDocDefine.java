@@ -12,8 +12,8 @@ public @interface SPDocDefine {
     String description() default "";
     String url() default "";
     String termsOfService() default "";
-    String version() default "";
-    String prefix() default "";
+    String version() default "1.0";
+    String key() default "";
     SPDocSecurity securitySchema() default @SPDocSecurity(scheme = "bearer",type = "http");
 
 }

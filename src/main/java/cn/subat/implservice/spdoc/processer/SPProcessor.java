@@ -8,7 +8,6 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.nodes.Tag;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.annotation.processing.*;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -18,11 +17,11 @@ import java.util.*;
 
 @SupportedAnnotationTypes("cn.subat.implservice.spdoc.annotation.*")
 @AutoService(Processor.class)
-public class SPPProcessor extends AbstractProcessor {
+public class SPProcessor extends AbstractProcessor {
 
     LinkedHashMap<String,Object> docMap;
 
-    public SPPProcessor() {
+    public SPProcessor() {
         docMap = new LinkedHashMap<>();
     }
 
@@ -66,6 +65,8 @@ public class SPPProcessor extends AbstractProcessor {
             String docName = docService.title().isEmpty()?service.getSimpleName().toString() : docService.title();
             String docDescription = docService.description().isEmpty()?"":docService.description();
             String docVersion = docService.version().isEmpty()?"":docService.version();
+            String docKey = docService.key().isEmpty()?"":docService.key();
+            info.put("key",docKey);
             info.put("title",docName);
             info.put("description",docDescription);
             info.put("version",docVersion);
