@@ -12,4 +12,6 @@ import java.util.Map;
 public @interface SPDocConsumer {
     String value() default "";
     SPDocCode[] code() default {};
+    String tag() default "";
+    String description() default "";
 }

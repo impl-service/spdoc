@@ -7,8 +7,9 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.nodes.Tag;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.processing.*;
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.tools.StandardLocation;
@@ -58,15 +59,16 @@ public class SPPProcessor extends AbstractProcessor {
      */
     private void processDefine(Set<? extends Element> defines){
         LinkedHashMap<String,String > info = new LinkedHashMap<>();
+        docMap.put("openapi","3.0.1");
+
         for (Element service:defines){
             SPDocDefine docService = service.getAnnotation(SPDocDefine.class);
             String docName = docService.title().isEmpty()?service.getSimpleName().toString() : docService.title();
             String docDescription = docService.description().isEmpty()?"":docService.description();
-            if(!docService.url().isEmpty()){
-                docMap.put("servers",Arrays.asList(new SPHashMap("url",docService.url(),"description","")));
-            }
+            String docVersion = docService.version().isEmpty()?"":docService.version();
             info.put("title",docName);
             info.put("description",docDescription);
+            info.put("version",docVersion);
             docMap.put("components",
                     new SPHashMap("securitySchemes",
                             new SPHashMap("auth",
@@ -78,10 +80,12 @@ public class SPPProcessor extends AbstractProcessor {
                             )
                     )
             );
+            docMap.put("info",info);
+            if(!docService.url().isEmpty()){
+                docMap.put("servers",Arrays.asList(new SPHashMap("url",docService.url(),"description","")));
+            }
             docMap.put("security",Arrays.asList(new SPHashMap("auth",Arrays.asList())));
         }
-        docMap.put("openapi","3.0.1");
-        docMap.put("info",info);
     }
 
 
@@ -115,21 +119,30 @@ public class SPPProcessor extends AbstractProcessor {
                     api = mirror.getElementValues().toString().split("\"")[1];
                 }
             }
-            SPDocService docService = consumer.getEnclosingElement().getAnnotation(SPDocService.class);
-            if(docService != null){
-                map.put("tags",new String[]{docService.value()});
-            }
-            map.put("description",docConsumer.value());
-            map.put(
-                    "requestBody", new SPHashMap(
-                            "content",new SPHashMap(
-                                    "application/json",new SPHashMap(
-                                            "schema",processConsumerParam(consumer)
-                                    )
-                            )
-                    )
-            );
 
+            if(docConsumer.tag().isEmpty()){
+                SPDocService docService = consumer.getEnclosingElement().getAnnotation(SPDocService.class);
+                if(docService != null){
+                    map.put("tags",new String[]{docService.value()});
+                }
+            }else{
+                map.put("tags",new String[]{docConsumer.tag()});
+            }
+
+
+            map.put("summary",docConsumer.value());
+            map.put("description",docConsumer.description());
+
+            LinkedHashMap<String, Object> paramMap = processConsumerParam(consumer);
+            if(paramMap.keySet().size()>0){
+                map.put(
+                        "requestBody", new SPHashMap(
+                                "content",new SPHashMap(
+                                "application/json",new SPHashMap(
+                                "schema",processConsumerParam(consumer)
+                        )))
+                );
+            }
 
             LinkedHashMap<String,Object> responseMao = new LinkedHashMap<>();
             responseMao.put("1",new SPHashMap(
@@ -145,7 +158,7 @@ public class SPPProcessor extends AbstractProcessor {
                 }
             }
             map.put("responses",responseMao);
-            path.put(api,new SPHashMap("post",map));
+            path.put("/"+api,new SPHashMap("post",map));
         }
         docMap.put("paths",path);
     }
@@ -162,18 +175,40 @@ public class SPPProcessor extends AbstractProcessor {
         LinkedHashMap<String,Object> map = new LinkedHashMap<>();
         ExecutableElement executable = (ExecutableElement) consumer;
         List<? extends VariableElement> parameters = executable.getParameters();
-        if(parameters.size() > 0){
-            if(parameters.size() == 1){
-                map = typeMirrorToMap(parameters.get(0).asType(),consumer.asType());
-            }else{
-                LinkedHashMap<String,Object> subMap = new LinkedHashMap<>();
-                for (VariableElement variableElement:parameters){
-                    subMap.put(variableElement.getSimpleName().toString(),typeMirrorToMap(variableElement.asType(),consumer.asType()));
+
+
+        if(parameters.size() == 0) return map;
+
+        //check the body annotation
+        LinkedHashMap<String,Object> subMap = new LinkedHashMap<>();
+        ArrayList<String> requiredList = new ArrayList<>();
+        for (VariableElement variableElement:parameters){
+            boolean required = true;
+            String name = camelToSnake(variableElement.getSimpleName().toString());
+            for (AnnotationMirror mirror: variableElement.getAnnotationMirrors()){
+                Element element = mirror.getAnnotationType().asElement();
+                if(element.getSimpleName().toString().equals("Body")){
+                    return typeMirrorToMap(variableElement.asType(),consumer.asType());
                 }
-                map.put("type","object");
-                map.put("properties",subMap);
+                if(element.getSimpleName().toString().equals("Nullable")){
+                    required = false;
+                }
             }
+            if(required){
+                requiredList.add(name);
+            }
+            LinkedHashMap<String,Object> map1 = typeMirrorToMap(variableElement.asType(),consumer.asType());
+            if(variableElement.getAnnotation(SPDocField.class) != null){
+                SPDocField docField = variableElement.getAnnotation(SPDocField.class);
+                map1.put("description",docField.value());
+                map1.put("format",docField.format());
+            }
+            subMap.put(name,map1);
         }
+        map.put("type","object");
+        map.put("required",requiredList);
+        map.put("properties",subMap);
+
         return map;
     }
 
@@ -196,6 +231,7 @@ public class SPPProcessor extends AbstractProcessor {
                         name = mirror.getElementValues().toString().split("\"")[1];
                     }
                 }
+                name = camelToSnake(name);
                 map.put(name,childMap);
             }
         }
@@ -204,21 +240,34 @@ public class SPPProcessor extends AbstractProcessor {
 
     private LinkedHashMap<String,Object> typeMirrorToMap(TypeMirror parameter,TypeMirror parentType){
         LinkedHashMap<String,Object> map = new LinkedHashMap<>();
-
-
-
         switch (parameter.getKind()){
             case DECLARED:{
                 DeclaredType parameterType = (DeclaredType) parameter;
                 if(parameterType.asElement().getEnclosingElement().toString().equals("java.lang")){
                     map = javaLangTypeToMap(parameterType);
                 }else if (parameterType.asElement().getEnclosingElement().toString().equals("java.util")){
-                    map = javaUtilTypeToMap(parameterType);
+                    map = javaUtilTypeToMap(parameterType,parentType);
                 }else {
-                    if(parameterType.asElement().getAnnotation(SPDoc.class) != null){
-                        map.put("type",parameterType.asElement().getSimpleName().toString());
-                        map.put("properties",declareTypeToMap(parameterType));
+                    map.put("type",parameterType.asElement().getSimpleName().toString());
+                    map.put("properties",declareTypeToMap(parameterType));
+                    ArrayList<String> requiredList = new ArrayList<>();
+                    for (Element element:parameterType.asElement().getEnclosedElements()){
+                        if(element.getKind() == ElementKind.FIELD){
+                            boolean required = true;
+                            String name = camelToSnake(element.getSimpleName().toString());
+                            for (AnnotationMirror mirror: element.getAnnotationMirrors()){
+                                Element element1 = mirror.getAnnotationType().asElement();
+                                if(element1.getSimpleName().toString().equals("Nullable")){
+                                    required = false;
+                                }
+                            }
+                            if(required){
+                                requiredList.add(name);
+                            }
+                        }
                     }
+                    map.put("required",requiredList);
+
                 }
 
                 break;
@@ -234,7 +283,7 @@ public class SPPProcessor extends AbstractProcessor {
             }
             case TYPEVAR:{
                 if(parentType instanceof DeclaredType){
-                    return typeMirrorToMap(((DeclaredType) parentType).getTypeArguments().get(0),parentType);
+                    return typeMirrorToMap(((DeclaredType) parentType).getTypeArguments().get(0), parentType);
                 }
                 break;
             }
@@ -256,24 +305,47 @@ public class SPPProcessor extends AbstractProcessor {
             case "Integer":
             case "Long":{
                 map.put("type","integer");
+                break;
+            }
+            default:{
+                //System.out.println(declaredType.asElement().getSimpleName().toString());
             }
         }
         return map;
     }
 
-    private LinkedHashMap<String,Object> javaUtilTypeToMap(DeclaredType declaredType){
+    private LinkedHashMap<String,Object> javaUtilTypeToMap(DeclaredType declaredType,TypeMirror parentType){
         LinkedHashMap<String,Object> map = new LinkedHashMap<>();
         switch (declaredType.asElement().getSimpleName().toString()){
             case "List":{
                 map.put("type","array");
                 TypeMirror typeMirror = declaredType.getTypeArguments().get(0);
-                map.put("items",typeMirrorToMap(typeMirror,declaredType));
+                if(typeMirror instanceof DeclaredType){
+                    map.put("items",typeMirrorToMap(typeMirror,typeMirror));
+                }else{
+                    DeclaredType declaredType1 = (DeclaredType) parentType;
+                    if(declaredType1.getTypeArguments().size()>0){
+                        map.put("items",typeMirrorToMap(declaredType1.getTypeArguments().get(0),declaredType1.getTypeArguments().get(0)));
+                    }
+                }
                 break;
             }
         }
         return map;
     }
 
+
+    public static final String CAMEL_CASE_REGEX = "([a-z]+)([A-Z]+)";
+
+    public static final String SNAKE_CASE_PATTERN = "$1\\_$2";
+
+
+    public String camelToSnake(@Nonnull String str){
+        return str.replaceAll(
+                        CAMEL_CASE_REGEX,
+                        SNAKE_CASE_PATTERN)
+                .toLowerCase();
+    }
 
 
 
