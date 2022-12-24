@@ -49,6 +49,20 @@ public class SPProcessor extends AbstractProcessor {
             e.printStackTrace();
         }
 
+        InputStream inputStream = getClass().getClassLoader().getResourceAsStream("index.html");
+        if (inputStream == null) {
+            return true;
+        }
+        try {
+            String html = new String(inputStream.readAllBytes(), "UTF-8");
+            Writer writer = processingEnv.getFiler()
+                    .createResource(StandardLocation.CLASS_OUTPUT, "spdoc", "index.html").openWriter();
+            writer.write(html);
+            writer.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         return true;
     }
 

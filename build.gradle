@@ -6,6 +6,8 @@ group 'cn.subat.implservice'
 version '0.1'
 
 repositories {
+    maven { url 'https://maven.aliyun.com/repository/public/' }
+    mavenLocal()
     mavenCentral()
 }
 
