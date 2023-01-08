@@ -36,7 +36,6 @@ public class SPProcessor extends AbstractProcessor {
         }
 
         processDefine(roundEnv.getElementsAnnotatedWith(SPDocDefine.class));
-        processService(roundEnv.getElementsAnnotatedWith(SPDocService.class));
         processConsumer(roundEnv.getElementsAnnotatedWith(SPDocConsumer.class));
 
         Yaml yaml = new Yaml();
@@ -49,20 +48,23 @@ public class SPProcessor extends AbstractProcessor {
             e.printStackTrace();
         }
 
-        InputStream inputStream = getClass().getClassLoader().getResourceAsStream("index.html");
-        if (inputStream == null) {
-            return true;
+        String[] files = new String[]{"index.html","rapidoc-min.js"};
+        for (String file : files) {
+            try {
+                InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(file);
+                OutputStream outputStream = processingEnv.getFiler()
+                        .createResource(StandardLocation.CLASS_OUTPUT, "spdoc", file).openOutputStream();
+                byte[] bytes = new byte[1024];
+                int len;
+                while ((len = inputStream.read(bytes)) != -1) {
+                    outputStream.write(bytes, 0, len);
+                }
+                inputStream.close();
+                outputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-        try {
-            String html = new String(inputStream.readAllBytes(), "UTF-8");
-            Writer writer = processingEnv.getFiler()
-                    .createResource(StandardLocation.CLASS_OUTPUT, "spdoc", "index.html").openWriter();
-            writer.write(html);
-            writer.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
         return true;
     }
 
@@ -104,24 +106,6 @@ public class SPProcessor extends AbstractProcessor {
     }
 
 
-    /**
-     * 处理所有的服务作为tag
-     * @param services 服务集合
-     */
-    private void processService(Set<? extends Element> services){
-        ArrayList<Map<String,String>> list = new ArrayList<>();
-        for (Element service:services){
-            SPDocService docService = service.getAnnotation(SPDocService.class);
-            String serviceName = docService.value().isEmpty()?service.getSimpleName().toString() : docService.value();
-            String serviceDescription = docService.description().isEmpty()?"":docService.description();
-            LinkedHashMap<String,String> map = new LinkedHashMap<>();
-            map.put("name",serviceName);
-            map.put("description",serviceDescription);
-            list.add(map);
-        }
-        docMap.put("tags",list);
-    }
-
     private void processConsumer(Set<? extends Element> consumers){
         LinkedHashMap<String,Object> path = new LinkedHashMap<>();
         for (Element consumer:consumers){
@@ -135,17 +119,10 @@ public class SPProcessor extends AbstractProcessor {
                 }
             }
 
-            if(docConsumer.tag().isEmpty()){
-                SPDocService docService = consumer.getEnclosingElement().getAnnotation(SPDocService.class);
-                if(docService != null){
-                    map.put("tags",new String[]{docService.value()});
-                }
-            }else{
-                map.put("tags",new String[]{docConsumer.tag()});
-            }
-
+            map.put("tags",new String[]{docConsumer.tag()});
 
             map.put("summary",docConsumer.value());
+            
             map.put("description",docConsumer.description());
 
             LinkedHashMap<String, Object> paramMap = processConsumerParam(consumer);
@@ -262,6 +239,8 @@ public class SPProcessor extends AbstractProcessor {
                     map = javaLangTypeToMap(parameterType);
                 }else if (parameterType.asElement().getEnclosingElement().toString().equals("java.util")){
                     map = javaUtilTypeToMap(parameterType,parentType);
+                }else if(parameterType.asElement().getEnclosingElement().toString().equals("java.time")){
+                    map = javaLangTypeToMap(parameterType);
                 }else {
                     map.put("type",parameterType.asElement().getSimpleName().toString());
                     map.put("properties",declareTypeToMap(parameterType));
@@ -318,6 +297,7 @@ public class SPProcessor extends AbstractProcessor {
                 break;
             }
             case "Integer":
+            case "Instant":
             case "Long":{
                 map.put("type","integer");
                 break;
