@@ -1,4 +1,4 @@
-package cn.subat.implservice.spdoc.annotation;
+package cn.subat.impl.spdoc.annotation;
 
 import java.lang.annotation.*;
 

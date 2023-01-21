@@ -1,7 +1,6 @@
-package cn.subat.implservice.spdoc;
+package cn.subat.impl.spdoc;
 
 import java.util.HashMap;
-import java.util.Map;
 
 public class SPHashMap extends HashMap<Object,Object> {
 

@@ -1,7 +1,7 @@
-package cn.subat.implservice.spdoc.processer;
+package cn.subat.impl.spdoc.processer;
 
-import cn.subat.implservice.spdoc.SPHashMap;
-import cn.subat.implservice.spdoc.annotation.*;
+import cn.subat.impl.spdoc.SPHashMap;
+import cn.subat.impl.spdoc.annotation.*;
 import com.google.auto.service.AutoService;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -15,7 +15,7 @@ import javax.tools.StandardLocation;
 import java.io.*;
 import java.util.*;
 
-@SupportedAnnotationTypes("cn.subat.implservice.spdoc.annotation.*")
+@SupportedAnnotationTypes("cn.subat.impl.spdoc.annotation.*")
 @AutoService(Processor.class)
 public class SPProcessor extends AbstractProcessor {
 
