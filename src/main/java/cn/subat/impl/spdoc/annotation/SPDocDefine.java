@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
 public @interface SPDocDefine {
-    String title() default "";
+    String title();
     String description() default "";
     String url() default "";
     String termsOfService() default "";
