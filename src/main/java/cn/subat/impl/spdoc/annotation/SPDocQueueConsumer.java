@@ -7,10 +7,8 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.METHOD)
-public @interface SPDocConsumer {
+public @interface SPDocQueueConsumer {
     String value() default "";
-    SPDocCode[] code() default {};
-    String tag() default "";
+
     String description() default "";
-    String routing() default "";
 }

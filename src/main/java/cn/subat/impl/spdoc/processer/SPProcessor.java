@@ -37,6 +37,8 @@ public class SPProcessor extends AbstractProcessor {
 
         processDefine(roundEnv.getElementsAnnotatedWith(SPDocDefine.class));
         processConsumer(roundEnv.getElementsAnnotatedWith(SPDocConsumer.class));
+        processTopicConsumer(roundEnv.getElementsAnnotatedWith(SPDocTopicConsumer.class));
+        processQueueConsumer(roundEnv.getElementsAnnotatedWith(SPDocQueueConsumer.class));
 
         Yaml yaml = new Yaml();
         try {
@@ -202,6 +204,38 @@ public class SPProcessor extends AbstractProcessor {
         map.put("properties",subMap);
 
         return map;
+    }
+
+    private void processTopicConsumer(Set<? extends Element> consumers){
+        LinkedHashMap<String,Object> topics = new LinkedHashMap<>();
+        for (Element consumer:consumers){
+            SPDocTopicConsumer docConsumer = consumer.getAnnotation(SPDocTopicConsumer.class);
+            String api = "";
+            for (AnnotationMirror mirror: consumer.getAnnotationMirrors()){
+                Element element = mirror.getAnnotationType().asElement();
+                if(element.getSimpleName().toString().equals("Queue")){
+                    api = mirror.getElementValues().toString().split("\"")[1];
+                }
+            }
+            topics.put(api,docConsumer.routing());
+        }
+        docMap.put("topics",topics);
+    }
+
+    private void processQueueConsumer(Set<? extends Element> consumers){
+        LinkedHashMap<String,Object> queues = new LinkedHashMap<>();
+        for (Element consumer:consumers){
+            SPDocQueueConsumer docConsumer = consumer.getAnnotation(SPDocQueueConsumer.class);
+            String api = "";
+            for (AnnotationMirror mirror: consumer.getAnnotationMirrors()){
+                Element element = mirror.getAnnotationType().asElement();
+                if(element.getSimpleName().toString().equals("Queue")){
+                    api = mirror.getElementValues().toString().split("\"")[1];
+                }
+            }
+            queues.put(api,docConsumer.value());
+        }
+        docMap.put("queues",queues);
     }
 
 

@@ -7,10 +7,7 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.METHOD)
-public @interface SPDocConsumer {
-    String value() default "";
-    SPDocCode[] code() default {};
-    String tag() default "";
-    String description() default "";
-    String routing() default "";
+public @interface SPDocTopicConsumer {
+    String value();
+    String routing();
 }
