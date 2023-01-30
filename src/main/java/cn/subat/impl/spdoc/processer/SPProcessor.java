@@ -177,6 +177,18 @@ public class SPProcessor extends AbstractProcessor {
         LinkedHashMap<String,Object> subMap = new LinkedHashMap<>();
         ArrayList<String> requiredList = new ArrayList<>();
         for (VariableElement variableElement:parameters){
+
+            boolean ignore = false;
+
+            for (AnnotationMirror mirror: variableElement.getAnnotationMirrors()){
+                Element element = mirror.getAnnotationType().asElement();
+                if(element.getSimpleName().toString().equals("RabbitHeaders")){
+                    ignore = true;
+                }
+            }
+
+            if (ignore) continue;
+
             boolean required = true;
             String name = camelToSnake(variableElement.getSimpleName().toString());
             for (AnnotationMirror mirror: variableElement.getAnnotationMirrors()){
